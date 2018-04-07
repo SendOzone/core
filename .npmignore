@@ -1,4 +1,3 @@
-clients/
 database/
 dist/node.js.map
 dist/web*
@@ -8,6 +7,5 @@ jasmine.json
 karma.conf.js
 package-lock.json
 spec/
-src/
 index.js.map
 .*
