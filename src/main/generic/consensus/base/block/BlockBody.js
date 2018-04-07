@@ -120,7 +120,7 @@ class BlockBody {
                 return false;
             }
             previousAcc = acc;
-            
+
             // Check that pruned accounts are actually supposed to be pruned
             if (!acc.account.isToBePruned()) {
                 Log.w(BlockBody, 'Invalid block - invalid pruned account');

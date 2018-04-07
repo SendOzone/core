@@ -60,6 +60,7 @@ class MempoolTransactionSet {
      * @return {number}
      */
     numBelowFeePerByte(feePerByte) {
+        // PERF: binary search the list and slice
         return this._transactions.values().filter(t => t.fee / t.serializedSize < feePerByte).length;
     }
 

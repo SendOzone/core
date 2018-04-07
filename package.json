@@ -1,9 +1,9 @@
 {
-  "name": "nimiq",
+  "name": "ozone-core",
   "version": "0.9.1",
   "homepage": "https://nimiq.com/",
   "description": "",
-  "private": true,
+  "main": "./dist/node.js",
   "scripts": {
     "prepare": "gulp build-node",
     "build": "gulp build",

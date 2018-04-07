@@ -316,7 +316,7 @@ gulp.task('build-worker', function () {
     return gulp.src(sources.worker)
         .pipe(sourcemaps.init())
         .pipe(concat('worker.js'))
-        .pipe(uglify())
+        // .pipe(uglify())
         .pipe(sourcemaps.write('.'))
         .pipe(gulp.dest('dist'))
         .pipe(connect.reload());
@@ -424,7 +424,7 @@ gulp.task('build-node', function () {
     return gulp.src(NODE_SOURCES)
         .pipe(sourcemaps.init())
         .pipe(concat('node.js'))
-        .pipe(uglify(uglify_config))
+        // .pipe(uglify(uglify_config))
         .pipe(sourcemaps.write('.'))
         .pipe(gulp.dest('dist'));
 });

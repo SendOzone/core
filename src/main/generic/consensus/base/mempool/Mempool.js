@@ -13,6 +13,7 @@ class Mempool extends Observable {
         // Our pool of transactions.
         /** @type {SortedList.<Transaction>} */
         this._transactionsByFeePerByte = new SortedList(); // uses Transaction.compare, by fee descending
+        // HashMap is type <string, V> - this usage should fail!
         /** @type {HashMap.<Hash, Transaction>} */
         this._transactionsByHash = new HashMap();
         /** @type {HashMap.<Address, MempoolTransactionSet>} */

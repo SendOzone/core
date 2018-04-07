@@ -132,7 +132,7 @@ class BlockHeader {
         this._hash = this._hash || Hash.light(this.serialize(buf));
         return this._hash;
     }
-    
+
     /**
      * @param {SerialBuffer} [buf]
      * @return {Promise.<Hash>}
