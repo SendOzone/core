@@ -1,6 +1,6 @@
 {
   "name": "ozone-core",
-  "version": "0.9.2",
+  "version": "0.9.3",
   "homepage": "https://nimiq.com/",
   "description": "",
   "main": "./dist/node.js",
