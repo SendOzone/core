@@ -37,7 +37,9 @@ class WebSocketConnector extends Observable {
             return false;
         }
 
-        const ws = WebSocketFactory.newWebSocket(`wss://${peerAddress.host}:${peerAddress.port}`, {
+        // TODO inspect address for proto
+        const proto = process.env.LOCAL === '1' ? 'ws' : 'wss';
+        const ws = WebSocketFactory.newWebSocket(`${proto}://${peerAddress.host}:${peerAddress.port}`, {
             handshakeTimeout: WebSocketConnector.CONNECT_TIMEOUT
         }, this._networkConfig);
         ws.binaryType = 'arraybuffer';

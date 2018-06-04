@@ -111,6 +111,11 @@ Policy.BLOCK_SIZE_MAX = 1e5; // 100 kb
  */
 Policy.BLOCK_TARGET_MAX = new BigNumber(2).pow(240);
 
+// near-instant mining
+if (process.env.LOCAL === '1') {
+  Policy.BLOCK_TARGET_MAX = new BigNumber(2).pow(255);
+}
+
 /**
  * Number of blocks we take into account to calculate next difficulty.
  * @type {number}

@@ -1,2 +1,6 @@
 ./.git
 ./node_modules
+./test-full-consensus
+./local-full-consensus
+./wallet
+./peer-key

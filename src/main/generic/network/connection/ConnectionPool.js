@@ -43,7 +43,7 @@ class ConnectionPool extends Observable {
          * @private
          */
         this._connectionsByPeerAddress = new HashMap();
-        
+
         /**
          * HashMap from netAddresses to connections.
          * @type {HashMap.<NetAddress, Array.<PeerConnection>>}
@@ -447,7 +447,7 @@ class ConnectionPool extends Observable {
         // Create peer channel.
         const channel = new PeerChannel(conn);
         channel.on('signal', msg => this._signalProcessor.onSignal(channel, msg));
- 
+
         peerConnection.peerChannel = channel;
 
         // Create network agent.
@@ -573,7 +573,7 @@ class ConnectionPool extends Observable {
         if (peer.netAddress && !peer.netAddress.isPseudo() && this.getConnectionsByNetAddress(peer.netAddress).indexOf(peerConnection) < 0) {
             this._addNetAddress(peerConnection, peer.netAddress);
         }
- 
+
         this._updateConnectedPeerCount(peerConnection, 1);
 
         this._addresses.established(peer.channel, peer.peerAddress);

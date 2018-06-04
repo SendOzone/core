@@ -309,6 +309,9 @@ class WsPeerAddress extends PeerAddress {
      * @returns {boolean}
      */
     globallyReachable() {
+        if (process.env.LOCAL === '1') {
+          return true;
+        }
         return NetUtils.hostGloballyReachable(this.host);
     }
 
@@ -341,16 +344,18 @@ class WsPeerAddress extends PeerAddress {
      * @returns {string}
      */
     hashCode() {
+        const proto = process.env.LOCAL === '1' ? 'ws' : 'wss';
         return this.peerId
-            ? `wss:///${this.peerId}`
-            : `wss://${this._host}:${this._port}/`;
+            ? `${proto}:///${this.peerId}`
+            : `${proto}://${this._host}:${this._port}/`;
     }
 
     /**
      * @returns {string}
      */
     toString() {
-        return `wss://${this._host}:${this._port}/${this.peerId ? this.peerId : ''}`;
+        const proto = process.env.LOCAL === '1' ? 'ws' : 'wss';
+        return `${proto}://${this._host}:${this._port}/${this.peerId ? this.peerId : ''}`;
     }
 
     /**

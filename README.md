@@ -1,3 +1,7 @@
+```
+LOCAL=1      # Disable TLS, Ignore block difficulty, Ignore network reachability
+```
+
 # Nimiq Blockchain [![Build Status](https://travis-ci.org/nimiq-network/core.svg)](https://travis-ci.org/nimiq-network/core)
 
 **[Nimiq](https://nimiq.com/)** is a frictionless payment protocol for the web.
@@ -64,10 +68,10 @@ Executing `yarn build` concatenates all sources into `dist/{web,web-babel,web-cr
 ### Build binary packages for Linux distributions
 
 After completing the [Quickstart](#quickstart), follow the steps below to build a Linux package. After the build process:
-- the package will be located in the `dist/` directory, 
+- the package will be located in the `dist/` directory,
 - once the package has been installed,
     - a [configuration file](#run-node-js-client) will be located in `/etc/nimiq/nimiq.conf` and
-    - a `systemd` service will be avialable which you can manage with `systemctl start|stop|restart nimiq`. 
+    - a `systemd` service will be avialable which you can manage with `systemctl start|stop|restart nimiq`.
 
 #### Debian/Ubuntu (deb package format)
 

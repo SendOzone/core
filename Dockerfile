@@ -1,7 +1,7 @@
-FROM node:9.2.0
+FROM node:9.7.1
 
 # yarn
-RUN curl -o- -L https://yarnpkg.com/install.sh | bash -s -- --version 1.2.1
+RUN curl -o- -L https://yarnpkg.com/install.sh | bash -s -- --version 1.7.0
 
 # Cache dependencies
 COPY yarn.lock /tmp/yarn.lock

@@ -873,6 +873,29 @@ GenesisConfig.CONFIGS = {
       GENESIS_ACCOUNTS: 'AAHQq9NXZIVne1f1GSxsY8BZm1FqvAAAAHKYqT3gAA==',
     },
 
+    'local': {
+      NETWORK_ID: 1,
+      NETWORK_NAME: 'local',
+      SEED_PEERS: [
+          WsPeerAddress.seed('127.0.0.1', 8443, '8f55fbb266157e722aca78735e36b2feecbb969d5221ce9d82cd875ea8d9736d'),
+      ],
+      GENESIS_BLOCK: new Block(
+        new BlockHeader(
+          new Hash(null),
+          new Hash(null),
+          Hash.fromBase64('nVtxMP3RlCdAbx1Hd4jsH4ZsZQsu/1UK+zUFsUNWgbs='),
+          Hash.fromBase64('xqxZFQ0mz9jhB1Dpes21KIFdr93fGyyyQqJKEb8TKWY='),
+          BlockUtils.difficultyToCompact(1),
+          1,
+          0,
+          4,
+          BlockHeader.Version.V1),
+        new BlockInterlink([], new Hash(null)),
+        new BlockBody(Address.fromBase64('G+RAkZY0pv47pfinGB/ku4ISwTw='), [])
+      ),
+      GENESIS_ACCOUNTS: 'AAHQq9NXZIVne1f1GSxsY8BZm1FqvAAAAHKYqT3gAA==',
+    },
+
     'dev': {
         NETWORK_ID: 2,
         NETWORK_NAME: 'dev',

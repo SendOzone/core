@@ -53,7 +53,8 @@ class BasePoolMiner extends Miner {
         if (this._ws) throw new Error('Call disconnect() first');
         this._host = host;
         this._port = port;
-        const ws = this._ws = new WebSocket(`wss://${host}:${port}`);
+        const proto = process.env.LOCAL === '1' ? 'ws' : 'wss';
+        const ws = this._ws = new WebSocket(`${proto}://${host}:${port}`);
         this._ws.onopen = () => this._onOpen(ws);
         this._ws.onerror = (e) => this._onError(ws, e);
         this._ws.onmessage = (msg) => this._onMessage(ws, JSON.parse(msg.data));

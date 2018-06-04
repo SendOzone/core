@@ -5,7 +5,7 @@ const JsonRpcServer = require('./modules/JsonRpcServer.js');
 const MetricsServer = require('./modules/MetricsServer.js');
 const config = require('./modules/Config.js')(argv);
 
-if ((!config.host || !config.port || !config.tls.key || !config.tls.cert) && !config.dumb || argv.help) {
+if ((!config.host || !config.port || !config.tls.key || !config.tls.cert) && (!config.dumb && process.env.LOCAL !== '1') || argv.help) {
     console.log(
         'Nimiq NodeJS client\n' +
         '\n' +

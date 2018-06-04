@@ -2,6 +2,72 @@ const http = require('http');
 const btoa = require('btoa');
 const Nimiq = require('../../../dist/node.js');
 
+const createBlock = async function(blockchain, {transactions, minerAddr}) {
+  const height = blockchain.head.height + 1;
+
+  let prunedAccounts = null;
+  if (!prunedAccounts) {
+      try {
+          prunedAccounts = await blockchain.accounts.gatherToBePrunedAccounts(transactions, height, blockchain._transactionCache);
+      } catch (e) {
+          prunedAccounts = [];
+      }
+  }
+
+  const body = new Nimiq.BlockBody(minerAddr, transactions, new Uint8Array(0), prunedAccounts);
+
+  const version = Nimiq.BlockHeader.Version.CURRENT_VERSION;
+  const nBits = Nimiq.BlockUtils.targetToCompact(await blockchain.getNextTarget());
+  const interlink = await blockchain.head.getNextInterlink(Nimiq.BlockUtils.compactToTarget(nBits), version);
+
+  const prevHash = blockchain.headHash;
+  const interlinkHash = interlink.hash();
+  const bodyHash = body.hash();
+
+  let accountsHash = null;
+  if (!accountsHash) {
+      const accountsTx = await blockchain._accounts.transaction();
+      try {
+          await accountsTx.commitBlockBody(body, height, blockchain._transactionCache);
+          accountsHash = await accountsTx.hash();
+      } catch (e) {
+          // The block is invalid, fill with broken accountsHash
+          // TODO: This is harmful, as it might cause tests to succeed that should fail.
+          accountsHash = new Hash(null);
+      }
+      await accountsTx.abort();
+  }
+
+  let nonce = 0;
+  const timestamp = blockchain.head.timestamp + Nimiq.Policy.BLOCK_TIME;
+  const header = new Nimiq.BlockHeader(prevHash, interlinkHash, bodyHash, accountsHash, nBits, height, timestamp, nonce, version);
+
+  const mine = async function() {
+    var depth, pow;
+    pow = await header.pow();
+    depth = Nimiq.BlockUtils.getHashDepth(pow);
+    if (depth >= 2) {
+      return true;
+    } else {
+      return false;
+    }
+  };
+
+  let i = 0;
+  while (i < 100) {
+    i += 1;
+    nonce += 1;
+    header.nonce = nonce;
+    if (await mine()) {
+      break;
+    }
+  }
+
+  const block = new Nimiq.Block(header, interlink, body);
+
+  return block;
+};
+
 class JsonRpcServer {
     /**
      * @param {{port: number, corsdomain: string|Array.<string>, username: ?string, password: ?string}} config
@@ -9,7 +75,8 @@ class JsonRpcServer {
     constructor(config) {
         if (typeof config.corsdomain === 'string') config.corsdomain = [config.corsdomain];
         if (!config.corsdomain) config.corsdomain = [];
-        http.createServer((req, res) => {
+        this._rpcPort = config.port
+        this._server = http.createServer((req, res) => {
             if (config.corsdomain.includes(req.headers.origin)) {
                 res.setHeader('Access-Control-Allow-Origin', req.headers.origin);
                 res.setHeader('Access-Control-Allow-Methods', 'POST');
@@ -27,13 +94,16 @@ class JsonRpcServer {
                 res.writeHead(200);
                 res.end();
             }
-        }).listen(config.port, '127.0.0.1');
-
+        });
 
         /** @type {Map.<string, function(*)>} */
         this._methods = new Map();
 
         this._consensus_state = 'syncing';
+    }
+
+    destroy() {
+        this._server.close()
     }
 
     /**
@@ -46,6 +116,9 @@ class JsonRpcServer {
      * @param {WalletStore} walletStore
      */
     init(consensus, blockchain, accounts, mempool, network, miner, walletStore) {
+        this._server.listen(this._rpcPort, '127.0.0.1');
+        this._methods.set('mineBlock', this.mineBlock.bind(this))
+
         this._consensus = consensus;
         this._blockchain = blockchain;
         this._accounts = accounts;
@@ -98,6 +171,21 @@ class JsonRpcServer {
 
         this._methods.set('constant', this.constant.bind(this));
         this._methods.set('log', this.log.bind(this));
+    }
+
+    async mineBlock(txHashes) {
+      const txs = txHashes ?
+        txHashes.map((hash) =>
+          this._mempool.getTransaction(Nimiq.Hash.fromHex(hash))
+        ).sort((a, b) => a.compareBlockOrder(b))
+      : this._mempool.getTransactions()
+
+      const minerAddr = Nimiq.Address.fromBase64('G+RAkZY0pv47pfinGB/ku4ISwTw=')
+      const block = await createBlock(this._blockchain, {
+        transactions: txs,
+        minerAddr: minerAddr
+      })
+      this._blockchain.pushBlock(block)
     }
 
     constant(constant, value) {
@@ -184,7 +272,7 @@ class JsonRpcServer {
         if (split.length === 1 || (split.length === 4 && split[3].length > 0)) {
             const peerId = Nimiq.PeerId.fromHex(split[split.length - 1]);
             peerAddress = this._network.addresses.getByPeerId(peerId);
-        } else if (split[0] === 'wss:' && split.length >= 3) {
+        } else if ((split[0] === 'wss:' || split[0] === 'ws:') && split.length >= 3) {
             const colons = split[2].split(':', 2);
             if (colons.length === 2) {
                 peerAddress = this._network.addresses.get(Nimiq.WsPeerAddress.seed(colons[0], parseInt(colons[1])));
@@ -249,7 +337,7 @@ class JsonRpcServer {
         const fee = parseInt(tx.fee);
         const data = tx.data ? Nimiq.BufferUtils.fromHex(tx.data) : null;
         /** @type {Wallet} */
-        const wallet = await this._walletStore.get(from);
+        const wallet = tx.walletKeyPair && await Nimiq.Wallet.loadPlain(tx.walletKeyPair) || await this._walletStore.get(from);
         if (!wallet || !(wallet instanceof Nimiq.Wallet)) {
             throw new Error(`"${tx.from}" can not sign transactions using this node.`);
         }
