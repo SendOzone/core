@@ -16,6 +16,7 @@ const TAG = 'Config';
  * @property {boolean} passive
  * @property {number} statistics
  * @property {{enabled: boolean, threads: string|number, throttleAfter: number, throttleWait: number, extraData: string}} miner
+ * @property {{enabled: boolean, host: string, port: number}} poolMining
  * @property {{enabled: boolean, port: number, corsdomain: string|Array.<string>}} rpcServer
  * @property {{enabled: boolean, port: number, password: string}} metricsServer
  * @property {{seed: string, address: string}} wallet
@@ -30,11 +31,10 @@ const DEFAULT_CONFIG = /** @type {Config} */ {
         cert: null,
         key: null
     },
-    port: 8080,
+    port: 8443,
     dumb: false,
     type: 'full',
-    // TODO set default to 'main' for MainNet.
-    network: 'dev',
+    network: 'main',
     passive: false,
     statistics: 0,
     miner: {
@@ -44,10 +44,18 @@ const DEFAULT_CONFIG = /** @type {Config} */ {
         throttleWait: 100,
         extraData: ''
     },
+    poolMining: {
+        enabled: false,
+        host: null,
+        port: -1,
+        mode: 'smart'
+    },
     rpcServer: {
         enabled: false,
         port: 8648,
-        corsdomain: null
+        corsdomain: null,
+        username: null,
+        password: null
     },
     metricsServer: {
         enabled: false,
@@ -89,11 +97,21 @@ const CONFIG_TYPES = {
             extraData: 'string'
         }
     },
+    poolMining: {
+        type: 'object', sub: {
+            enabled: 'boolean',
+            host: 'string',
+            port: 'number',
+            mode: {type: 'string', values: ['smart', 'nano']}
+        }
+    },
     rpcServer: {
         type: 'object', sub: {
             enabled: 'boolean',
             port: 'number',
-            corsdomain: {type: 'mixed', types: ['string', {type: 'array', inner: 'string'}]}
+            corsdomain: {type: 'mixed', types: ['string', {type: 'array', inner: 'string'}]},
+            username: 'string',
+            password: 'string'
         }
     },
     metricsServer: {
@@ -266,6 +284,14 @@ function readFromArgs(argv, config = merge({}, DEFAULT_CONFIG)) {
         if (typeof argv.miner === 'number') config.miner.threads = argv.miner;
         if (typeof argv.miner === 'string') config.miner.threads = parseInt(argv.miner);
         if (typeof argv['extra-data'] === 'string') config.miner.extraData = argv['extra-data'];
+    }
+    if (argv.pool) {
+        config.poolMining.enabled = true;
+        if (typeof argv.pool === 'string') {
+            const split = argv.pool.split(':', 2);
+            config.poolMining.host = split[0];
+            config.poolMining.port = parseInt(split[1]);
+        }
     }
     if (argv.rpc) {
         config.rpcServer.enabled = true;

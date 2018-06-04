@@ -187,7 +187,7 @@ class FullChain extends BaseChain {
         }
 
         // Otherwise, check if the new chain is harder than our current main chain.
-        if (chainData.totalDifficulty > this.totalDifficulty) {
+        if (chainData.totalDifficulty.gt(this.totalDifficulty)) {
             // A fork has become the hardest chain, rebranch to it.
             if (!(await this._rebranch(hash, chainData))) {
                 this._blockInvalidCount++;
@@ -662,12 +662,12 @@ class FullChain extends BaseChain {
         return this._mainChain.head.height;
     }
 
-    /** @type {number} */
+    /** @type {BigNumber} */
     get totalDifficulty() {
         return this._mainChain.totalDifficulty;
     }
 
-    /** @type {number} */
+    /** @type {BigNumber} */
     get totalWork() {
         return this._mainChain.totalWork;
     }
@@ -719,6 +719,11 @@ class FullChain extends BaseChain {
     // XXX Do we really want to expose this?
     accountsHash() {
         return this._accounts.hash();
+    }
+
+    /** @type {PrioritySynchronizer} */
+    get queue() {
+        return this._synchronizer;
     }
 }
 

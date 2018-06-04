@@ -30,6 +30,7 @@ if ((!config.host || !config.port || !config.tls.key || !config.tls.cert) && !co
         '  --log-tag=TAG[:LEVEL]      Configure log level for a specific tag.\n' +
         '  --miner[=THREADS]          Activate mining on this node. The miner will be set\n' +
         '                             up to use THREADS parallel threads.\n' +
+        '  --pool=SERVER:PORT         Mine shares for mining pool with address SERVER:PORT\n' +
         '  --passive                  Do not actively connect to the network and do not\n' +
         '                             wait for connection establishment.\n' +
         '  --rpc[=PORT]               Start JSON-RPC server on port PORT (default: 8648).\n' +
@@ -53,7 +54,6 @@ if ((!config.host || !config.port || !config.tls.key || !config.tls.cert) && !co
     process.exit();
 }
 
-const statisticsOptions = argv.statistics;
 const isNano = config.type === 'nano';
 
 if (isNano && config.miner.enabled) {
@@ -80,17 +80,21 @@ if (config.host && config.dumb) {
     console.error('Cannot use both --host and --dumb');
     process.exit(1);
 }
+if (config.type === 'light') {
+    console.error('Light node type is temporarily disabled.');
+    process.exit(1);
+}
 
 Nimiq.Log.instance.level = config.log.level;
-for(const tag in config.log.tags) {
+for (const tag in config.log.tags) {
     Nimiq.Log.instance.setLoggable(tag, config.log.tags[tag]);
 }
 
-for(const key in config.constantOverrides) {
+for (const key in config.constantOverrides) {
     Nimiq.ConstantHelper.instance.set(key, config.constantOverrides[key]);
 }
 
-for(const seedPeer of config.seedPeers) {
+for (const seedPeer of config.seedPeers) {
     if (!seedPeer.host || !seedPeer.port) {
         console.error('Seed peers must have host and port attributes set');
         process.exit(1);
@@ -166,8 +170,26 @@ const $ = {};
 
     Nimiq.Log.i(TAG, `Blockchain state: height=${$.blockchain.height}, headHash=${$.blockchain.headHash}`);
 
-    const extraData = config.miner.extraData ? Nimiq.BufferUtils.fromAscii(config.miner.extraData) : undefined;
-    $.miner = new Nimiq.Miner($.blockchain, $.accounts, $.mempool, $.network.time, $.wallet.address, extraData);
+    const extraData = config.miner.extraData ? Nimiq.BufferUtils.fromAscii(config.miner.extraData) : new Uint8Array(0);
+    if (config.poolMining.enabled) {
+        const deviceId = Nimiq.BasePoolMiner.generateDeviceId(networkConfig);
+        const poolMode = isNano ? 'nano' : config.poolMining.mode;
+        switch (poolMode) {
+            case 'nano':
+                $.miner = new Nimiq.NanoPoolMiner($.blockchain, $.network.time, $.wallet.address, deviceId);
+                break;
+            case 'smart':
+            default:
+                $.miner = new Nimiq.SmartPoolMiner($.blockchain, $.accounts, $.mempool, $.network.time, $.wallet.address, deviceId, extraData);
+                break;
+        }
+        $.consensus.on('established', () => {
+            Nimiq.Log.i(TAG, `Connecting to pool ${config.poolMining.host} using device id ${deviceId} as a ${poolMode} client.`);
+            $.miner.connect(config.poolMining.host, config.poolMining.port);
+        });
+    } else {
+        $.miner = new Nimiq.Miner($.blockchain, $.accounts, $.mempool, $.network.time, $.wallet.address, extraData);
+    }
 
     $.blockchain.on('head-changed', (head) => {
         if ($.consensus.established || head.height % 100 === 0) {
@@ -208,10 +230,10 @@ const $ = {};
         Nimiq.Log.i(TAG, `Block mined: #${block.header.height}, hash=${block.header.hash()}`);
     });
 
-    if (statisticsOptions) {
+    if (config.statistics > 0) {
         // Output regular statistics
         const hashrates = [];
-        const outputInterval = typeof statisticsOptions === 'number' ? statisticsOptions : 10; // seconds
+        const outputInterval = config.statistics;
 
         $.miner.on('hashrate-changed', async (hashrate) => {
             hashrates.push(hashrate);

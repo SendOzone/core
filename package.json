@@ -1,14 +1,14 @@
 {
   "name": "ozone-core",
-  "version": "0.9.3",
+  "version": "1.1.2",
+  "main": "dist/node.js",
   "homepage": "https://nimiq.com/",
   "description": "",
-  "main": "./dist/node.js",
   "scripts": {
     "prepare": "gulp build-node",
     "build": "gulp build",
-    "build-deb": "gulp --architecture=`dpkg --print-architecture` prepare-packages && cd packaging/BUILD && mv lib/nimiq_node_generic.node lib/nimiq_node.node && mv fakeroot/etc/nimiq/sample.conf fakeroot/etc/nimiq/nimiq.conf && node-deb --no-default-package-dependencies x -- node *.js cron-deb.sh VERSION lib/ modules/ && mv *.deb ../../dist/",
-    "build-rpm": "gulp --architecture=`arch` prepare-packages && cd packaging && mv BUILD/lib/nimiq_node_generic.node BUILD/lib/nimiq_node.node && mv BUILD/fakeroot/etc/nimiq/sample.conf BUILD/fakeroot/etc/nimiq/nimiq.conf && rpmbuild -bb SPECS/nimiq.spec && mv RPMS/x86_64/*.rpm ../dist",
+    "build-deb": "gulp --architecture=`dpkg --print-architecture` prepare-packages && cd packaging/BUILD && mv build/nimiq_node_generic.node build/nimiq_node.node && mv fakeroot/etc/nimiq/sample.conf fakeroot/etc/nimiq/nimiq.conf && node-deb --no-default-package-dependencies x -- node *.js cron-deb.sh VERSION build/ lib/ modules/ && mv *.deb ../../dist/",
+    "build-rpm": "gulp --architecture=`arch` prepare-packages && cd packaging && mv BUILD/build/nimiq_node_generic.node BUILD/build/nimiq_node.node && mv BUILD/fakeroot/etc/nimiq/sample.conf BUILD/fakeroot/etc/nimiq/nimiq.conf && rpmbuild -bb SPECS/nimiq.spec && mv RPMS/x86_64/*.rpm ../dist",
     "esdoc": "esdoc",
     "test": "jasmine && gulp test",
     "test-node": "jasmine",
@@ -30,7 +30,14 @@
   "engines": {
     "node": ">=7.9.0"
   },
+  "files": [
+    "dist/node.js",
+    "binding.gyp",
+    "src/native"
+  ],
   "node_deb": {
+    "package_name": "nimiq",
+    "version": "1.1.2-1",
     "init": "systemd",
     "architecture": "none",
     "install_strategy": "copy",
@@ -49,15 +56,18 @@
       "daemon": "app/node /usr/share/nimiq/app/index.js"
     }
   },
+  "gypfile": true,
   "dependencies": {
+    "@nimiq/jungle-db": "^0.9.14-alpha",
     "atob": "^2.0.3",
+    "bindings": "^1.3.0",
     "btoa": "^1.1.2",
     "chalk": "^2.3.2",
     "json5": "^1.0.1",
     "lodash.merge": "^4.6.1",
-    "@nimiq/jungle-db": "^0.9.6",
+    "minimist": "^1.2.0",
     "nan": "^2.10.0",
-    "ws": "^5.1.0"
+    "uws": "^9.14.0"
   },
   "devDependencies": {
     "babel-cli": "^6.26.0",
@@ -88,6 +98,7 @@
     "gulp-watch": "^5.0.0",
     "istanbul": "^1.1.0-alpha.1",
     "jasmine": "^3.1.0",
+    "jasmine-console-reporter": "^3.0.0",
     "jasmine-core": "^3.1.0",
     "karma": "^2.0.0",
     "karma-chrome-launcher": "^2.2.0",
@@ -99,7 +110,12 @@
     "karma-sauce-launcher": "^1.2.0",
     "merge2": "^1.2.1",
     "node-deb": "^0.10.4",
+    "node-gyp": "^3.6.2",
     "vinyl-buffer": "^1.0.1",
     "vinyl-source-stream": "^2.0.0"
+  },
+  "optionalDependencies": {
+    "bufferutil": "^3.0.4",
+    "utf-8-validate": "^4.0.1"
   }
 }

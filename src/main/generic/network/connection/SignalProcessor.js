@@ -50,7 +50,7 @@ class SignalProcessor {
         }
 
         // Can be undefined for non-rtc nodes.
-        const myPeerId = this._networkConfig.peerAddress.peerId;
+        const myPeerId = this._networkConfig.peerId;
 
         // Discard signals from myself.
         if (msg.senderId.equals(myPeerId)) {
@@ -155,8 +155,7 @@ class SignalStore {
         if (this.contains(senderId, recipientId, nonce)) {
             const signal = new ForwardedSignal(senderId, recipientId, nonce);
             this._store.put(signal, Date.now());
-            this._queue.remove(signal);
-            this._queue.enqueue(signal);
+            this._queue.requeue(signal);
             return;
         }
 

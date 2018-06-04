@@ -26,6 +26,13 @@ const sources = {
             './src/main/platform/browser/network/websocket/WebSocketFactory.js',
             './src/main/platform/browser/network/DnsUtils.js'
         ],
+        offline: [
+            './src/main/platform/browser/Class.js',
+            './src/main/platform/browser/utils/LogNative.js',
+            './src/main/generic/utils/Log.js',
+            './src/main/generic/utils/Observable.js',
+            './src/main/platform/browser/crypto/CryptoLib.js',
+        ],
         node: [
             './src/main/platform/nodejs/utils/LogNative.js',
             './src/main/generic/utils/Log.js',
@@ -46,6 +53,7 @@ const sources = {
         './src/main/generic/utils/array/ArrayUtils.js',
         './src/main/generic/utils/array/HashMap.js',
         './src/main/generic/utils/array/HashSet.js',
+        './src/main/generic/utils/array/LimitHashSet.js',
         './src/main/generic/utils/array/InclusionHashSet.js',
         './src/main/generic/utils/array/LimitInclusionHashSet.js',
         './src/main/generic/utils/array/LimitIterable.js',
@@ -67,6 +75,7 @@ const sources = {
         './src/main/generic/utils/crypto/CryptoWorker.js',
         './src/main/generic/utils/crypto/CryptoWorkerImpl.js',
         './src/main/generic/utils/crc/CRC32.js',
+        './src/main/generic/utils/number/BigNumber.js',
         './src/main/generic/utils/number/NumberUtils.js',
         './src/main/generic/utils/merkle/MerkleTree.js',
         './src/main/generic/utils/merkle/MerklePath.js',
@@ -199,12 +208,47 @@ const sources = {
         './src/main/generic/network/PeerKeyStore.js',
         './src/main/generic/network/Peer.js',
         './src/main/generic/miner/Miner.js',
+        './src/main/generic/miner/BasePoolMiner.js',
+        './src/main/generic/miner/SmartPoolMiner.js',
+        './src/main/generic/miner/NanoPoolMiner.js',
         './src/main/generic/wallet/Wallet.js',
         './src/main/generic/wallet/MultiSigWallet.js',
         './src/main/generic/wallet/WalletStore.js',
         './src/main/generic/miner/MinerWorker.js',
         './src/main/generic/miner/MinerWorkerImpl.js',
         './src/main/generic/miner/MinerWorkerPool.js'
+    ],
+    offline: [
+        './src/main/generic/utils/array/ArrayUtils.js',
+        './src/main/generic/utils/assert/Assert.js',
+        './src/main/generic/utils/buffer/BufferUtils.js',
+        './src/main/generic/utils/buffer/SerialBuffer.js',
+        './src/main/generic/utils/number/BigNumber.js',
+        './src/main/generic/utils/number/NumberUtils.js',
+        './src/main/generic/utils/merkle/MerklePath.js',
+        './src/main/generic/utils/platform/PlatformUtils.js',
+        './src/main/generic/utils/string/StringUtils.js',
+        './src/main/generic/consensus/Policy.js',
+        './src/main/generic/consensus/base/primitive/Serializable.js',
+        './src/main/generic/consensus/base/primitive/Hash.js',
+        './src/main/generic/consensus/base/primitive/PrivateKey.js',
+        './src/main/generic/consensus/base/primitive/PublicKey.js',
+        './src/main/generic/consensus/base/primitive/KeyPair.js',
+        './src/main/generic/consensus/base/primitive/RandomSecret.js',
+        './src/main/generic/consensus/base/primitive/Signature.js',
+        './src/main/generic/consensus/base/primitive/Commitment.js',
+        './src/main/generic/consensus/base/primitive/CommitmentPair.js',
+        './src/main/generic/consensus/base/primitive/PartialSignature.js',
+        './src/main/generic/consensus/base/account/Address.js',
+        './src/main/generic/consensus/base/account/Account.js',
+        './src/main/generic/consensus/base/transaction/Transaction.js',
+        './src/main/generic/consensus/base/transaction/SignatureProof.js',
+        './src/main/generic/consensus/base/transaction/BasicTransaction.js',
+        './src/main/generic/consensus/base/transaction/ExtendedTransaction.js',
+        './src/main/generic/utils/IWorker.js',
+        './src/main/generic/utils/WasmHelper.js',
+        './src/main/generic/utils/crypto/CryptoWorker.js',
+        './src/main/generic/consensus/GenesisConfigOffline.js'
     ],
     test: [
         'src/test/specs/**/*.spec.js'
@@ -380,6 +424,57 @@ gulp.task('build-web', ['build-worker'], function () {
         .pipe(connect.reload());
 });
 
+const OFFLINE_SOURCES = [
+    './src/main/platform/browser/index.prefix.js',
+    ...sources.platform.offline,
+    ...sources.offline,
+    './src/main/platform/browser/index.suffix.js'
+];
+
+gulp.task('build-offline-babel', function () {
+    return merge(
+        browserify([], {
+            require: [
+                'babel-runtime/core-js/array/from',
+                'babel-runtime/core-js/object/values',
+                'babel-runtime/core-js/object/freeze',
+                'babel-runtime/core-js/object/keys',
+                'babel-runtime/core-js/json/stringify',
+                'babel-runtime/core-js/number/is-integer',
+                'babel-runtime/core-js/number/max-safe-integer',
+                'babel-runtime/core-js/math/clz32',
+                'babel-runtime/core-js/math/fround',
+                'babel-runtime/core-js/math/imul',
+                'babel-runtime/core-js/math/trunc',
+                'babel-runtime/core-js/promise',
+                'babel-runtime/core-js/get-iterator',
+                'babel-runtime/regenerator',
+                'babel-runtime/helpers/asyncToGenerator'
+            ]
+        }).bundle()
+            .pipe(source('babel.js'))
+            .pipe(buffer()),
+        gulp.src(OFFLINE_SOURCES, {base: '.'})
+            .pipe(sourcemaps.init({loadMaps: true}))
+            .pipe(concat('web-offline.js'))
+            .pipe(babel(babel_config)))
+        .pipe(sourcemaps.init())
+        .pipe(concat('web-offline-babel.js'))
+        .pipe(uglify(uglify_babel))
+        .pipe(sourcemaps.write('.'))
+        .pipe(gulp.dest('dist'));
+});
+
+gulp.task('build-offline', function () {
+    return gulp.src(OFFLINE_SOURCES, {base: '.'})
+        .pipe(sourcemaps.init({loadMaps: true}))
+        .pipe(concat('web-offline.js'))
+        .pipe(uglify(uglify_config))
+        .pipe(sourcemaps.write('.'))
+        .pipe(gulp.dest('dist'))
+        .pipe(connect.reload());
+});
+
 gulp.task('build-web-istanbul', ['build-worker', 'build-istanbul'], function () {
     return gulp.src(BROWSER_SOURCES.map(f => f.indexOf('./src/main') === 0 ? `./.istanbul/${f}` : f), {base: '.'})
         .pipe(sourcemaps.init({loadMaps: true}))
@@ -420,17 +515,15 @@ const NODE_SOURCES = [
 ];
 
 gulp.task('build-node', function () {
-    gulp.src(['build/Release/nimiq_node.node']).pipe(gulp.dest('dist'));
     return gulp.src(NODE_SOURCES)
         .pipe(sourcemaps.init())
         .pipe(concat('node.js'))
-        // .pipe(uglify(uglify_config))
+        //.pipe(uglify(uglify_config))
         .pipe(sourcemaps.write('.'))
         .pipe(gulp.dest('dist'));
 });
 
 gulp.task('build-node-istanbul', ['build-istanbul'], function () {
-    gulp.src(['build/Release/nimiq_node.node']).pipe(gulp.dest('dist'));
     return gulp.src(NODE_SOURCES.map(f => `./.istanbul/${f}`))
         .pipe(sourcemaps.init())
         .pipe(concat('node-istanbul.js'))
@@ -447,18 +540,18 @@ const RELEASE_SOURCES = [
 const RELEASE_LIB = [
     'dist/node.*',
     'dist/worker-*',
-    'build/Release/nimiq_node_generic.node'
 ];
 
 gulp.task('prepare-packages', ['build-node'], function () {
     gulp.src(RELEASE_SOURCES).pipe(gulp.dest('packaging/BUILD'));
     gulp.src(['clients/nodejs/sample.conf']).pipe(gulp.dest('packaging/BUILD/fakeroot/etc/nimiq'));
     gulp.src(['package.json']).pipe(replace('"architecture": "none"', `"architecture": "${util.env.architecture}"`)).pipe(gulp.dest('packaging/BUILD'));
-    gulp.src(['clients/nodejs/nimiq']).pipe(replace('node index.js', '/usr/share/nimiq/{{ cli_entrypoint }}')).pipe(gulp.dest('packaging/BUILD'));
+    gulp.src(['clients/nodejs/nimiq']).pipe(replace('node "\\$SCRIPT_PATH/index.js"', '/usr/share/nimiq/{{ cli_entrypoint }}')).pipe(gulp.dest('packaging/BUILD'));
     gulp.src(['clients/nodejs/index.js']).pipe(replace('../../dist/node.js', './lib/node.js')).pipe(gulp.dest('packaging/BUILD'));
     gulp.src(['clients/nodejs/modules/*.js']).pipe(replace('../../../dist/node.js', '../lib/node.js')).pipe(gulp.dest('packaging/BUILD/modules'));
     gulp.src(['node_modules/**/*'], {base: '.', dot: true }).pipe(gulp.dest('packaging/BUILD'));
     gulp.src(RELEASE_LIB).pipe(gulp.dest('packaging/BUILD/lib'));
+    gulp.src('build/Release/nimiq_node_generic.node').pipe(gulp.dest('packaging/BUILD/build'));
 });
 
 gulp.task('test', ['watch'], function () {
@@ -506,6 +599,6 @@ gulp.task('serve', ['watch'], function () {
     });
 });
 
-gulp.task('build', ['build-web', 'build-web-babel', 'build-web-istanbul', 'build-loader', 'build-node', 'build-node-istanbul']);
+gulp.task('build', ['build-web', 'build-web-babel', 'build-web-istanbul', 'build-offline', 'build-offline-babel', 'build-loader', 'build-node', 'build-node-istanbul']);
 
 gulp.task('default', ['build', 'serve']);

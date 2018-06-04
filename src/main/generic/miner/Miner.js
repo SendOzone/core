@@ -1,6 +1,6 @@
 class Miner extends Observable {
     /**
-     * @param {IBlockchain} blockchain
+     * @param {BaseChain} blockchain
      * @param {Accounts} accounts
      * @param {Mempool} mempool
      * @param {Time} time
@@ -12,7 +12,7 @@ class Miner extends Observable {
      */
     constructor(blockchain, accounts, mempool, time, minerAddress, extraData = new Uint8Array(0)) {
         super();
-        /** @type {IBlockchain} */
+        /** @type {BaseChain} */
         this._blockchain = blockchain;
         /** @type {Accounts} */
         this._accounts = accounts;
@@ -111,14 +111,25 @@ class Miner extends Observable {
         /** @type {boolean} */
         this._submittingBlock = false;
 
-        // Listen to changes in the mempool which evicts invalid transactions
-        // after every blockchain head change and then fires 'transactions-ready'
-        // when the eviction process finishes. Restart work on the next block
-        // with fresh transactions when this fires.
-        this._mempool.on('transactions-ready', () => this._startWork());
+        /** @type {number} */
+        this._shareCompact = 0;
 
-        // Immediately start processing transactions when they come in.
-        this._mempool.on('transaction-added', () => this._mempoolChanged = true);
+        /** @type {boolean} */
+        this._shareCompactSet = false;
+
+        /** @type {number} */
+        this._numBlocksMined = 0;
+
+        if (this._mempool) {
+            // Listen to changes in the mempool which evicts invalid transactions
+            // after every blockchain head change and then fires 'transactions-ready'
+            // when the eviction process finishes. Restart work on the next block
+            // with fresh transactions when this fires.
+            this._mempool.on('transactions-ready', () => this._startWork());
+
+            // Immediately start processing transactions when they come in.
+            this._mempool.on('transaction-added', () => this._mempoolChanged = true);
+        }
     }
 
     startWork() {
@@ -156,11 +167,16 @@ class Miner extends Observable {
             // Construct next block.
             this._retry = 0;
             const block = await this.getNextBlock();
+            if (block === null) {
+                this.stopWork();
+                return;
+            }
 
-            Log.d(Miner, `Starting work on block #${block.header.height} with ${block.transactionCount} transactions (${this._hashrate} H/s)`);
+            Log.d(Miner, `Starting work on block #${block.header.height} with ${block.isFull() ? block.transactionCount : '(set by pool)'} transactions (${this._hashrate} H/s)`);
 
-            this._workerPool.startMiningOnBlock(block).catch(Log.w.tag(Miner));
+            this._workerPool.startMiningOnBlock(block, this._shareCompactSet ? this._shareCompact : undefined).catch(Log.w.tag(Miner));
         } catch (e) {
+            Log.e(Miner, e);
             Log.w(Miner, 'Failed to start work, retrying in 100ms');
             this.stopWork();
             setTimeout(() => this.startWork(), 100);
@@ -177,24 +193,33 @@ class Miner extends Observable {
         this._hashCount += this._workerPool.noncesPerRun;
         if (obj.block && obj.block.prevHash.equals(this._blockchain.headHash)) {
             Log.d(Miner, () => `Received share: ${obj.nonce} / ${obj.hash.toHex()}`);
-            if (BlockUtils.isProofOfWork(obj.hash, obj.block.target) && !this._submittingBlock) {
+            if (!this._submittingBlock) {
                 obj.block.header.nonce = obj.nonce;
-                this._submittingBlock = true;
-                if (await obj.block.header.verifyProofOfWork()) {
-                    // Tell listeners that we've mined a block.
-                    this.fire('block-mined', obj.block, this);
 
-                    // Push block into blockchain.
-                    if ((await this._blockchain.pushBlock(obj.block)) < 0) {
-                        this._submittingBlock = false;
-                        this._startWork().catch(Log.w.tag(Miner));
-                        return;
+                let blockValid = false;
+                if (obj.block.isFull() && BlockUtils.isProofOfWork(obj.hash, obj.block.target)) {
+                    this._submittingBlock = true;
+                    if (await obj.block.header.verifyProofOfWork()) {
+                        this._numBlocksMined++;
+                        blockValid = true;
+
+                        // Tell listeners that we've mined a block.
+                        this.fire('block-mined', obj.block, this);
+
+                        // Push block into blockchain.
+                        if ((await this._blockchain.pushBlock(obj.block)) < 0) {
+                            this._submittingBlock = false;
+                            this._startWork().catch(Log.w.tag(Miner));
+                            return;
+                        } else {
+                            this._submittingBlock = false;
+                        }
                     } else {
-                        this._submittingBlock = false;
+                        Log.d(Miner, `Ignoring invalid share: ${await obj.block.header.pow()}`);
                     }
-                } else {
-                    Log.d(Miner, `Ignoring invalid share: ${await obj.block.header.pow()}`);
                 }
+
+                this.fire('share', obj.block, blockValid, this);
             }
         }
         if (this._mempoolChanged && this._lastRestart + Miner.MIN_TIME_ON_BLOCK < Date.now()) {
@@ -204,7 +229,6 @@ class Miner extends Observable {
 
     /**
      * @return {Promise.<Block>}
-     * @private
      */
     async getNextBlock() {
         this._retry++;
@@ -213,7 +237,7 @@ class Miner extends Observable {
             const interlink = await this._getNextInterlink(nextTarget);
             const body = await this._getNextBody(interlink.serializedSize);
             const header = await this._getNextHeader(nextTarget, interlink, body);
-            if ((await this._blockchain.getNextTarget()) !== nextTarget) return this.getNextBlock();
+            if (!(await this._blockchain.getNextTarget()).equals(nextTarget)) return this.getNextBlock();
             return new Block(header, interlink, body);
         } catch (e) {
             // Retry up to three times.
@@ -223,11 +247,11 @@ class Miner extends Observable {
     }
 
     /**
-     * @param {number} nextTarget
+     * @param {BigNumber} nextTarget
      * @param {BlockInterlink} interlink
      * @param {BlockBody} body
      * @return {Promise.<BlockHeader>}
-     * @private
+     * @protected
      */
     async _getNextHeader(nextTarget, interlink, body) {
         const prevHash = this._blockchain.headHash;
@@ -240,10 +264,10 @@ class Miner extends Observable {
         try {
             await accounts.commitBlockBody(body, height, this._blockchain.transactionCache);
             accountsHash = await accounts.hash();
-            await accounts.abort();
         } catch (e) {
-            await accounts.abort();
             throw new Error(`Invalid block body: ${e.message}`);
+        } finally {
+            await accounts.abort();
         }
 
         const bodyHash = body.hash();
@@ -254,9 +278,9 @@ class Miner extends Observable {
     }
 
     /**
-     * @param {number} nextTarget
+     * @param {BigNumber} nextTarget
      * @returns {Promise.<BlockInterlink>}
-     * @private
+     * @protected
      */
     _getNextInterlink(nextTarget) {
         return this._blockchain.head.getNextInterlink(nextTarget);
@@ -265,7 +289,7 @@ class Miner extends Observable {
     /**
      * @param {number} interlinkSize
      * @return {BlockBody}
-     * @private
+     * @protected
      */
     async _getNextBody(interlinkSize) {
         const maxSize = Policy.BLOCK_SIZE_MAX
@@ -279,7 +303,7 @@ class Miner extends Observable {
 
     /**
      * @return {number}
-     * @private
+     * @protected
      */
     _getNextTimestamp() {
         const now = Math.floor(this._time.now() / 1000);
@@ -307,7 +331,7 @@ class Miner extends Observable {
         this._workerPool.stop();
         this.fire('stop', this);
 
-        Log.i(Miner, 'Stopped work');
+        Log.d(Miner, 'Stopped work');
     }
 
     /**
@@ -343,6 +367,14 @@ class Miner extends Observable {
     /** @type {Address} */
     get address() {
         return this._address;
+    }
+
+    /** @type {Address} */
+    set address(addr) {
+        if (addr && !addr.equals(this._address)) {
+            this._address = addr;
+            this._startWork().catch(Log.w.tag(Miner));
+        }
     }
 
     /** @type {boolean} */
@@ -389,6 +421,34 @@ class Miner extends Observable {
      */
     set throttleAfter(throttleAfter) {
         this._workerPool.runsPerCycle = throttleAfter;
+    }
+
+    /** @type {Uint8Array} */
+    get extraData() {
+        return this._extraData;
+    }
+
+    /** @type {Uint8Array} */
+    set extraData(extra) {
+        if (!BufferUtils.equals(extra, this._extraData)) {
+            this._extraData = extra;
+            this._startWork().catch(Log.w.tag(Miner));
+        }
+    }
+
+    /** @type {number} */
+    set shareCompact(targetCompact) {
+        if (!targetCompact) {
+            this._shareCompactSet = false;
+        } else {
+            this._shareCompact = targetCompact;
+            this._shareCompactSet = true;
+        }
+    }
+
+    /** @type {number} */
+    get numBlocksMined() {
+        return this._numBlocksMined;
     }
 }
 

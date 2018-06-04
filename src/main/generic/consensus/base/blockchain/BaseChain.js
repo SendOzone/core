@@ -49,6 +49,14 @@ class BaseChain extends IBlockchain {
     }
 
     /**
+     * @param {Block} block
+     * @returns {Promise<Array.<Block>>}
+     */
+    async getSuccessorBlocks(block) {
+        return this._store.getSuccessorBlocks(block);
+    }
+
+    /**
      * @returns {Promise.<Array.<Hash>>}
      */
     async getBlockLocators() {
@@ -72,10 +80,16 @@ class BaseChain extends IBlockchain {
                 locators.push(await block.hash()); // eslint-disable-line no-await-in-loop
             }
             step *= 2;
+            // Respect max size for GetBlocksMessages
+            if (locators.length >= GetBlocksMessage.LOCATORS_MAX_COUNT) break;
         }
 
         // Push the genesis block hash.
         if (locators.length === 0 || !locators[locators.length - 1].equals(GenesisConfig.GENESIS_HASH)) {
+            // Respect max size for GetBlocksMessages, make space for genesis hash if necessary
+            if (locators.length >= GetBlocksMessage.LOCATORS_MAX_COUNT) {
+                locators.pop();
+            }
             locators.push(GenesisConfig.GENESIS_HASH);
         }
 
@@ -85,9 +99,10 @@ class BaseChain extends IBlockchain {
     /**
      * Computes the target value for the block after the given block or the head of this chain if no block is given.
      * @param {Block} [block]
-     * @returns {Promise.<number>}
+     * @param {Block} [next]
+     * @returns {Promise.<BigNumber>}
      */
-    async getNextTarget(block) {
+    async getNextTarget(block, next) {
         /** @type {ChainData} */
         let headData;
         if (block) {
@@ -97,6 +112,11 @@ class BaseChain extends IBlockchain {
         } else {
             block = this.head;
             headData = this._mainChain;
+        }
+
+        if (next) {
+            headData = await headData.nextChainData(next);
+            block = next;
         }
 
         // Retrieve the timestamp of the block that appears DIFFICULTY_BLOCK_WINDOW blocks before the given block in the chain.
@@ -112,7 +132,7 @@ class BaseChain extends IBlockchain {
                 prevData = await this._store.getChainData(prevData.head.prevHash);
                 if (!prevData) {
                     // Not enough blocks are available to compute the next target, fail.
-                    return -1;
+                    return null;
                 }
             }
 
@@ -123,12 +143,12 @@ class BaseChain extends IBlockchain {
             }
         }
 
-        if (!tailData || tailData.totalDifficulty < 1) {
+        if (!tailData || tailData.totalDifficulty.lt(1)) {
             // Not enough blocks are available to compute the next target, fail.
-            return -1;
+            return null;
         }
 
-        const deltaTotalDifficulty = headData.totalDifficulty - tailData.totalDifficulty;
+        const deltaTotalDifficulty = headData.totalDifficulty.minus(tailData.totalDifficulty);
         return BlockUtils.getNextTarget(headData.head.header, tailData.head.header, deltaTotalDifficulty);
     }
 
@@ -571,7 +591,7 @@ class BaseChain extends IBlockchain {
         const score1 = await NanoChain._getProofScore(proof1.prefix, lca, m);
         const score2 = await NanoChain._getProofScore(proof2.prefix, lca, m);
         return score1 === score2
-            ? proof1.suffix.totalDifficulty() >= proof2.suffix.totalDifficulty()
+            ? proof1.suffix.totalDifficulty().gt(proof2.suffix.totalDifficulty())
             : score1 > score2;
     }
 
@@ -610,6 +630,7 @@ class BaseChain extends IBlockchain {
 
         return maxScore;
     }
+
 }
 BaseChain.MultilevelStrategy = {
     STRICT: 1,

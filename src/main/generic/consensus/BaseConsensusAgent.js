@@ -20,7 +20,7 @@ class BaseConsensusAgent extends Observable {
         this._synced = false;
 
         // Set of all objects (InvVectors) that we think the remote peer knows.
-        /** @type {InclusionHashSet.<InvVector>} */
+        /** @type {LimitInclusionHashSet.<InvVector>} */
         this._knownObjects = new LimitInclusionHashSet(BaseConsensusAgent.KNOWN_OBJECTS_COUNT_MAX);
         this._knownObjects.add(new InvVector(InvVector.Type.BLOCK, peer.headHash));
 
@@ -274,7 +274,6 @@ class BaseConsensusAgent extends Observable {
      * @protected
      */
     _onSubscribe(msg) {
-        Log.d(BaseConsensusAgent, `[SUBSCRIBE] ${this._peer.peerAddress} ${msg.subscription}`);
         this._remoteSubscription = msg.subscription;
     }
 
@@ -748,6 +747,7 @@ class BaseConsensusAgent extends Observable {
                     if (tx) {
                         // We have found a requested transaction, send it back to the sender.
                         this._peer.channel.tx(tx);
+                        this.fire('transaction-relayed', tx);
                     } else {
                         // Requested transaction is unknown.
                         unknownObjects.push(vector);
