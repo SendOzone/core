@@ -113,7 +113,7 @@ Policy.BLOCK_TARGET_MAX = new BigNumber(2).pow(240);
 
 // near-instant mining
 if (process.env.LOCAL === '1') {
-  Policy.BLOCK_TARGET_MAX = new BigNumber(2).pow(255);
+  Policy.BLOCK_TARGET_MAX = new BigNumber(2).pow(254);
 }
 
 /**
