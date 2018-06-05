@@ -161,6 +161,9 @@ class MinerWorkerPool extends IWorker.Pool(MinerWorker) {
     async _singleMiner(nonceRange) {
         let i = 0;
         while (this._miningEnabled && (IWorker.areWorkersAsync || PlatformUtils.isNodeJs() || i === 0) && i < this._runsPerCycle) {
+            if (process.env.LOCAL === '1') {
+              await new Promise((resolve) => setTimeout(resolve, 1000))
+            }
             i++;
             const block = this._block;
             const result = await this.multiMine(block.header.serialize(), this._shareCompact, nonceRange.minNonce, nonceRange.maxNonce);
