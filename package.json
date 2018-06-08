@@ -34,6 +34,7 @@
     "dist/node.js",
     "dist/nimiq.js",
     "dist/web.js",
+    "dist/web-babel.js",
     "binding.gyp",
     "src/native"
   ],
