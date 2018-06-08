@@ -33,6 +33,7 @@
   "files": [
     "dist/node.js",
     "dist/nimiq.js",
+    "dist/web.js",
     "binding.gyp",
     "src/native"
   ],
