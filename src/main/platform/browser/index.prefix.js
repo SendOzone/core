@@ -1,5 +1,12 @@
 if (typeof Nimiq === 'undefined') {
-    var Nimiq = typeof window !== 'undefined' ? window : {};
+    if (typeof module !== 'undefined') {
+      var Nimiq = module.exports = {}
+    } else if (typeof window === 'undefined') {
+      var Nimiq = window.Nimiq = {}
+    } else {
+      var Nimiq = {}
+    }
+    // var Nimiq = typeof window !== 'undefined' ? window : {};
 }
 var Proxy; // ensure Proxy exists
 (function (exports) {

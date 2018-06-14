@@ -72,7 +72,8 @@ class WasmHelper {
             }
             return u;
         };
-        const fs = require('fs');
+        const _fs = 'fs'
+        const fs = require(_fs);
         try {
             const data = fs.readFileSync(wasm);
             WasmHelper._global[module] = WasmHelper._global[module] || {};
@@ -163,4 +164,3 @@ class WasmHelper {
 WasmHelper._moduleLoadedCallbacks = {};
 
 Class.register(WasmHelper);
-

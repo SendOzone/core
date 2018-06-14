@@ -112,7 +112,7 @@ Policy.BLOCK_SIZE_MAX = 1e5; // 100 kb
 Policy.BLOCK_TARGET_MAX = new BigNumber(2).pow(240);
 
 // near-instant mining
-if (process.env.LOCAL === '1') {
+if (typeof process !== 'undefined' && process.env.LOCAL === '1') {
   Policy.BLOCK_TARGET_MAX = new BigNumber(2).pow(254);
 }
 

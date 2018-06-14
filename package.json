@@ -32,9 +32,10 @@
   },
   "files": [
     "dist/node.js",
-    "dist/nimiq.js",
     "dist/web.js",
-    "dist/web-babel.js",
+    "dist/worker-wasm.js",
+    "dist/worker-wasm.wasm",
+    "dist/worker.js",
     "binding.gyp",
     "src/native"
   ],
